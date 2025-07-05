@@ -1,0 +1,11 @@
+.env
+secrets.conf
+*.swp
+*.tmp
+printer-[0-9]*_[0-9]*.cfg
+*.bak
+*.bkp
+calibration_data_x_20250622_234405.csv
+calibration_data_y_20250622_235155.csv
+1.7.0.zip
+1.8.zip

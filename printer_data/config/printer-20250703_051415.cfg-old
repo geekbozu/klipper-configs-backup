@@ -1,0 +1,354 @@
+# [include mmu/base/*.cfg]
+# [include mmu/optional/client_macros.cfg]
+# [include mmu/addons/mmu_erec_cutter.cfg]
+# This file contains common pin mappings for the BIGTREETECH SKR mini
+# E3 v3.0. To use this config, the firmware should be compiled for the
+# STM32G0B1 with a "8KiB bootloader" and USB communication.
+
+# The "make flash" command does not work on the SKR mini E3. Instead,
+# after running "make", copy the generated "out/klipper.bin" file to a
+# file named "firmware.bin" on an SD card and then restart the SKR
+# mini E3 with that SD card.
+
+# See docs/Config_Reference.md for a description of parameters.
+
+[stepper_x]
+step_pin: PB13
+dir_pin: !PB12
+enable_pin: !PB14
+microsteps: 16
+rotation_distance: 40
+endstop_pin: ^PC0
+position_endstop: 0
+position_max: 235
+homing_speed: 50
+
+[tmc2209 stepper_x]
+uart_pin: PC11
+tx_pin: PC10
+uart_address: 0
+run_current: 0.580
+stealthchop_threshold: 999999
+
+[stepper_y]
+step_pin: PB10
+dir_pin: !PB2
+enable_pin: !PB11
+microsteps: 16
+rotation_distance: 40
+endstop_pin: ^PC1
+position_endstop: 0
+position_max: 235
+homing_speed: 50
+
+
+[tmc2209 stepper_y]
+uart_pin: PC11
+tx_pin: PC10
+uart_address: 2
+run_current: 0.580
+stealthchop_threshold: 999999
+
+[stepper_z]
+step_pin: PB0
+dir_pin: PC5
+enable_pin: !PB1
+microsteps: 16
+rotation_distance: 8
+endstop_pin: probe:z_virtual_endstop
+position_min: -5
+position_max: 235
+
+
+[tmc2209 stepper_z]
+uart_pin: PC11
+tx_pin: PC10
+uart_address: 1
+run_current: 0.580
+stealthchop_threshold: 999999
+
+[extruder]
+step_pin: PB3
+dir_pin: !PB4
+enable_pin: !PD1
+microsteps: 16
+rotation_distance: 33.500
+nozzle_diameter: 0.400
+filament_diameter: 1.750
+heater_pin: PC8
+sensor_type: EPCOS 100K B57560G104F
+sensor_pin: PA0
+#control: pid
+#pid_Kp: 21.527
+#pid_Ki: 1.063
+#pid_Kd: 108.982
+min_temp: 0
+max_temp: 300
+min_extrude_temp: 10
+pressure_advance: 0.056
+
+[tmc2209 extruder]
+uart_pin: PC11
+tx_pin: PC10
+uart_address: 3
+run_current: 0.650
+
+[heater_bed]
+heater_pin: PC9
+sensor_type: EPCOS 100K B57560G104F
+sensor_pin: PC4
+#control: pid
+#pid_Kp: 54.027
+#pid_Ki: 0.770
+#pid_Kd: 948.182
+min_temp: 0
+max_temp: 130
+
+[heater_fan heatbreak_cooling_fan]
+pin: PC7
+
+[heater_fan controller_fan]
+pin: PB15
+
+[fan]
+pin: PC6
+
+[mcu]
+serial: /dev/serial/by-id/usb-Klipper_Klipper_firmware_12345-if00
+
+[printer]
+kinematics: cartesian
+max_velocity: 750
+max_accel: 5000
+max_z_velocity: 5
+max_z_accel: 100
+
+[board_pins]
+mcu: mcu
+aliases:
+    # EXP1 header
+    EXP1_1=PB5,  EXP1_3=PA9,   EXP1_5=PA10, EXP1_7=PB8, EXP1_9=<GND>,
+    EXP1_2=PA15, EXP1_4=<RST>, EXP1_6=PB9,  EXP1_8=PD6, EXP1_10=<5V>
+
+[display]
+lcd_type: st7920 
+cs_pin: EXP1_7 
+sclk_pin: EXP1_6 
+sid_pin: EXP1_8 
+encoder_pins: ^EXP1_5, ^EXP1_3 
+click_pin: ^!EXP1_2
+
+[output_pin beeper] 
+pin: PB5
+
+[probe]
+pin: ^!PC2  #! For inverted
+x_offset: -44
+#   The distance (in mm) between the probe and the nozzle along the
+#   x-axis. The default is 0.
+y_offset: -10
+#   The distance (in mm) between the probe and the nozzle along the
+#   y-axis. The default is 0.
+#z_offset: -0.85
+#   The distance (in mm) between the bed and the nozzle when the probe
+#   triggers. This parameter must be provided.
+#speed: 5.0
+#   Speed (in mm/s) of the Z axis when probing. The default is 5mm/s.
+
+
+[bed_mesh]
+speed: 120
+probe_count: 5, 5
+mesh_min: 15, 15
+mesh_max: 190, 220
+adaptive_margin: 5
+
+[safe_z_home]¶
+home_xy_position: 155, 130
+z_hop: 10
+    
+[mcu]
+serial: /dev/serial/by-id/usb-Klipper_stm32g0b1xx_2D003E0001504E5238363120-if00
+
+[gcode_macro TEST_SPEED]
+# Home, get position, throw around toolhead, home again.
+# If MCU stepper positions (first line in GET_POSITION) are greater than a full step different (your number of microsteps), then skipping occured.
+# We only measure to a full step to accomodate for endstop variance.
+# Example: TEST_SPEED SPEED=300 ACCEL=5000 ITERATIONS=10
+
+description: Test for max speed and acceleration parameters for the printer. Procedure: Home -> ReadPositionFromMCU -> MovesToolhead@Vel&Accel -> Home -> ReadPositionfromMCU
+
+gcode:
+    # Speed
+    {% set speed  = params.SPEED|default(printer.configfile.settings.printer.max_velocity)|int %}
+    # Iterations
+    {% set iterations = params.ITERATIONS|default(5)|int %}
+    # Acceleration
+    {% set accel  = params.ACCEL|default(printer.configfile.settings.printer.max_accel)|int %}
+    # Minimum Cruise Ratio
+    {% set min_cruise_ratio = params.MIN_CRUISE_RATIO|default(0.5)|float %}
+    # Bounding inset for large pattern (helps prevent slamming the toolhead into the sides after small skips, and helps to account for machines with imperfectly set dimensions)
+    {% set bound = params.BOUND|default(20)|int %}
+    # Size for small pattern box
+    {% set smallpatternsize = SMALLPATTERNSIZE|default(20)|int %}
+    
+    # Large pattern
+        # Max positions, inset by BOUND
+        {% set x_min = printer.toolhead.axis_minimum.x %}
+        {% if x_min < 0 %}
+            {% set x_min = 0 %}
+        {% endif %}
+    
+        {% set y_min = printer.toolhead.axis_minimum.y %}
+        {% if y_min < 0 %}
+            {% set y_min = 0 %}
+        {% endif %}
+    
+        {% set x_min = x_min + bound %}
+        {% set x_max = printer.toolhead.axis_maximum.x - bound %}
+        {% set y_min = y_min + bound %}
+        {% set y_max = printer.toolhead.axis_maximum.y - bound %}
+    
+    # Small pattern at center
+        # Find X/Y center point
+        {% set x_center = (printer.toolhead.axis_minimum.x|float + printer.toolhead.axis_maximum.x|float ) / 2 %}
+        {% set y_center = (printer.toolhead.axis_minimum.y|float + printer.toolhead.axis_maximum.y|float ) / 2 %}
+        
+        # Set small pattern box around center point
+        {% set x_center_min = x_center - (smallpatternsize/2) %}
+        {% set x_center_max = x_center + (smallpatternsize/2) %}
+        {% set y_center_min = y_center - (smallpatternsize/2) %}
+        {% set y_center_max = y_center + (smallpatternsize/2) %}
+
+    # Save current gcode state (absolute/relative, etc)
+    SAVE_GCODE_STATE NAME=TEST_SPEED
+    
+    # Output parameters to g-code terminal
+    { action_respond_info("TEST_SPEED: starting %d iterations at speed %d, accel %d" % (iterations, speed, accel)) }
+    
+    # Home and get position for comparison later:
+        M400 # Finish moves - https://github.com/AndrewEllis93/Print-Tuning-Guide/issues/66
+        G28
+        # QGL if not already QGLd (only if QGL section exists in config)
+        {% if printer.configfile.settings.quad_gantry_level %}
+            {% if printer.quad_gantry_level.applied == False %}
+                QUAD_GANTRY_LEVEL
+                G28 Z
+            {% endif %}
+        {% endif %} 
+        # Move 50mm away from max position and home again (to help with hall effect endstop accuracy - https://github.com/AndrewEllis93/Print-Tuning-Guide/issues/24)
+        G90
+        G1 X{printer.toolhead.axis_maximum.x-50} Y{printer.toolhead.axis_maximum.y-50} F{30*60}
+        M400 # Finish moves - https://github.com/AndrewEllis93/Print-Tuning-Guide/issues/66
+        G28 X Y
+        G0 X{printer.toolhead.axis_maximum.x-1} Y{printer.toolhead.axis_maximum.y-1} F{30*60}
+        G4 P1000 
+        GET_POSITION
+
+    # Go to starting position
+    G0 X{x_min} Y{y_min} Z{bound + 10} F{speed*60}
+
+    # Set new limits
+    {% if printer.configfile.settings.printer.minimum_cruise_ratio is defined %}
+        SET_VELOCITY_LIMIT VELOCITY={speed} ACCEL={accel} MINIMUM_CRUISE_RATIO={min_cruise_ratio}
+    {% else %}
+        SET_VELOCITY_LIMIT VELOCITY={speed} ACCEL={accel} ACCEL_TO_DECEL={accel / 2}
+    {% endif %}
+
+    {% for i in range(iterations) %}
+        # Large pattern diagonals
+        G0 X{x_min} Y{y_min} F{speed*60}
+        G0 X{x_max} Y{y_max} F{speed*60}
+        G0 X{x_min} Y{y_min} F{speed*60}
+        G0 X{x_max} Y{y_min} F{speed*60}
+        G0 X{x_min} Y{y_max} F{speed*60}
+        G0 X{x_max} Y{y_min} F{speed*60}
+        
+        # Large pattern box
+        G0 X{x_min} Y{y_min} F{speed*60}
+        G0 X{x_min} Y{y_max} F{speed*60}
+        G0 X{x_max} Y{y_max} F{speed*60}
+        G0 X{x_max} Y{y_min} F{speed*60}
+    
+        # Small pattern diagonals
+        G0 X{x_center_min} Y{y_center_min} F{speed*60}
+        G0 X{x_center_max} Y{y_center_max} F{speed*60}
+        G0 X{x_center_min} Y{y_center_min} F{speed*60}
+        G0 X{x_center_max} Y{y_center_min} F{speed*60}
+        G0 X{x_center_min} Y{y_center_max} F{speed*60}
+        G0 X{x_center_max} Y{y_center_min} F{speed*60}
+        
+        # Small pattern box
+        G0 X{x_center_min} Y{y_center_min} F{speed*60}
+        G0 X{x_center_min} Y{y_center_max} F{speed*60}
+        G0 X{x_center_max} Y{y_center_max} F{speed*60}
+        G0 X{x_center_max} Y{y_center_min} F{speed*60}
+    {% endfor %}
+
+    # Restore max speed/accel/accel_to_decel to their configured values
+    {% if printer.configfile.settings.printer.minimum_cruise_ratio is defined %}
+        SET_VELOCITY_LIMIT VELOCITY={printer.configfile.settings.printer.max_velocity} ACCEL={printer.configfile.settings.printer.max_accel} MINIMUM_CRUISE_RATIO={printer.configfile.settings.printer.minimum_cruise_ratio} 
+    {% else %}
+        SET_VELOCITY_LIMIT VELOCITY={printer.configfile.settings.printer.max_velocity} ACCEL={printer.configfile.settings.printer.max_accel} ACCEL_TO_DECEL={printer.configfile.settings.printer.max_accel_to_decel}
+    {% endif %}
+
+    # Re-home and get position again for comparison:
+        M400 # Finish moves - https://github.com/AndrewEllis93/Print-Tuning-Guide/issues/66
+        G28 # This is a full G28 to fix an issue with CoreXZ - https://github.com/AndrewEllis93/Print-Tuning-Guide/issues/12
+        # Go to XY home positions (in case your homing override leaves it elsewhere)
+        G90
+        G0 X{printer.toolhead.axis_maximum.x-1} Y{printer.toolhead.axis_maximum.y-1} F{30*60}
+        G4 P1000 
+        GET_POSITION
+
+    # Restore previous gcode state (absolute/relative, etc)
+    RESTORE_GCODE_STATE NAME=TEST_SPEED
+    
+
+[exclude_object]
+[include timelapse.cfg]
+[include mainsail.cfg]
+#[include adxl.cfg]
+
+#*# <---------------------- SAVE_CONFIG ---------------------->
+#*# DO NOT EDIT THIS BLOCK OR BELOW. The contents are auto-generated.
+#*#
+#*# [bed_mesh default]
+#*# version = 1
+#*# points =
+#*# 	0.047500, 0.080000, 0.117500, 0.110000, 0.145000
+#*# 	-0.090000, -0.047500, -0.002500, 0.022500, 0.022500
+#*# 	-0.110000, -0.072500, -0.035000, -0.025000, -0.037500
+#*# 	-0.087500, -0.050000, -0.005000, 0.025000, 0.015000
+#*# 	0.050000, 0.085000, 0.132500, 0.152500, 0.145000
+#*# x_count = 5
+#*# y_count = 5
+#*# mesh_x_pps = 2
+#*# mesh_y_pps = 2
+#*# algo = lagrange
+#*# tension = 0.2
+#*# min_x = 15.0
+#*# max_x = 190.0
+#*# min_y = 15.0
+#*# max_y = 220.0
+#*#
+#*# [probe]
+#*# z_offset = 0.805
+#*#
+#*# [extruder]
+#*# control = pid
+#*# pid_kp = 33.217
+#*# pid_ki = 2.356
+#*# pid_kd = 117.090
+#*#
+#*# [heater_bed]
+#*# control = pid
+#*# pid_kp = 66.317
+#*# pid_ki = 1.019
+#*# pid_kd = 1079.304
+#*#
+#*# [input_shaper]
+#*# shaper_type_x = ei
+#*# shaper_freq_x = 43.4
+#*# shaper_type_y = mzv
+#*# shaper_freq_y = 31.0
